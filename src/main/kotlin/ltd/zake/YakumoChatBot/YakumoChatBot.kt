@@ -6,6 +6,7 @@ import com.google.auto.service.AutoService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ltd.zake.YakumoChatBot.MyPluginMain.YCDate.signList
+import ltd.zake.YakumoChatBot.tool.SqlStorage
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.console.data.AutoSavePluginConfig
 import net.mamoe.mirai.console.data.AutoSavePluginData
@@ -24,6 +25,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.text.SimpleDateFormat
 import kotlin.collections.set
+
 
 /*
 *
@@ -46,6 +48,7 @@ import kotlin.collections.set
 */
 
 val DriveName: String = "org.sqlite.JDBC"
+val Sql = SqlStorage()
 
 @AutoService(JvmPlugin::class)
 object MyPluginMain : KotlinPlugin(
@@ -73,6 +76,7 @@ object MyPluginMain : KotlinPlugin(
             }
         }
     }
+
 
     fun regAllSignUser(id: Long, days: Int?) {
         var signMap = YCDate.allSignDays
@@ -214,7 +218,7 @@ object MyPluginMain : KotlinPlugin(
 // 文游部分
             startsWith(YCCommand.logon, removePrefix = true) {
                 val statement = historyConn.createStatement()
-                val rSet = statement.executeQuery("SELECT Id FROM playerDate")
+                val rSet = Sql.readSqlDate(statement, "Id", "playerDate")
                 while (rSet.next()) {
                     YCDate.playerCanLogon.add(rSet.getLong(1))
                 }
@@ -225,7 +229,8 @@ object MyPluginMain : KotlinPlugin(
                     if (it.length > 20) {
                         reply("你的昵称太长啦")
                     } else {
-                        statement.executeUpdate("INSERT  INTO playerDate VALUES (${sender.id}, 20, 0, 1, 0)")
+                        //statement.executeUpdate("INSERT  INTO playerDate VALUES (${sender.id}, 20, 0, 1, 0)")
+                        Sql.writeSqlDate(statement, "playerDate", "${sender.id}, 20, 0, 1, 0")
                         logger.info("register player ${sender.id},niki${it}")
                         statement.close()
                     }
