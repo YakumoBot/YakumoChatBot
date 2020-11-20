@@ -17,7 +17,7 @@ apply(plugin = "com.github.johnrengelman.shadow")
 apply(plugin = "java")
 
 group = "ltd.zake"
-version = "1.0.1-Alphal"
+version = "1.0.1-20NO20a"
 
 repositories {
     mavenLocal()

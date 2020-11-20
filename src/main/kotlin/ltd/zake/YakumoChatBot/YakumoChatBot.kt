@@ -5,18 +5,14 @@ package ltd.zake.YakumoChatBot
 import com.google.auto.service.AutoService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import ltd.zake.YakumoChatBot.YakumoChatBotMain.YCDate.signList
+import ltd.zake.YakumoChatBot.MyPluginMain.YCDate.signList
 import net.mamoe.mirai.Bot
-import net.mamoe.mirai.console.command.CommandManager.INSTANCE.register
-import net.mamoe.mirai.console.command.CommandSender
-import net.mamoe.mirai.console.command.SimpleCommand
 import net.mamoe.mirai.console.data.AutoSavePluginConfig
 import net.mamoe.mirai.console.data.AutoSavePluginData
 import net.mamoe.mirai.console.data.PluginDataExtensions.mapKeys
 import net.mamoe.mirai.console.data.PluginDataExtensions.withEmptyDefault
 import net.mamoe.mirai.console.data.value
 import net.mamoe.mirai.console.permission.PermissionService
-import net.mamoe.mirai.console.permission.PermissionService.Companion.hasPermission
 import net.mamoe.mirai.console.plugin.jvm.JvmPlugin
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
@@ -52,10 +48,10 @@ import kotlin.collections.set
 val DriveName: String = "org.sqlite.JDBC"
 
 @AutoService(JvmPlugin::class)
-object YakumoChatBotMain : KotlinPlugin(
+object MyPluginMain : KotlinPlugin(
     JvmPluginDescription(
         "ltd.zake.YakumoChatBot",
-        "1.0.0"
+        "1.0.1-Alphal"
     )
 ) {
     val PERMISSION_EXECUTE_1 by lazy {
@@ -108,6 +104,8 @@ object YakumoChatBotMain : KotlinPlugin(
 
         YCSetting.reload() // 从数据库自动读取配置实例
         YCDate.reload()
+        YCExploreDate.reload()
+        YCCommand.reload()
 //=====================================================================================================================
         Class.forName(DriveName)//加载驱动,连接sqlite的jdbc
         val historyConn: Connection =
@@ -124,15 +122,18 @@ object YakumoChatBotMain : KotlinPlugin(
    ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝   
                                                                                                                  
 """
-        }// 输出一条日志.
-        YakumoChatBotMain.launch {
+        }
+        logger.warning(
+            "\n\n* 本插件仅供学习交流之用\n* 请勿将本插件用于一切商业性/非法用途\n\n"
+        )// 输出一条日志.
+        MyPluginMain.launch {
             while (true) {
                 cleanMonSign()
                 coldDown()
             }
         }
 
-        YCMainCommand.register();
+        //YCMainCommand.register();
 
         YCSetting.count++ // 对 Setting 的改动会自动在合适的时间保存
 
@@ -149,9 +150,9 @@ object YakumoChatBotMain : KotlinPlugin(
                     val time = it.split("分钟后提醒我")[0].toInt()
                     val things = it.split("分钟后提醒我")[1]
                     reply(At(sender as Member) + "提醒创建成功了")
-                    YakumoChatBotMain.launch {
+                    MyPluginMain.launch {
                         delay((60 * time * 1000 * 3600).toLong())
-                        reply("[提醒]\n@${sender.nameCard}}\n现在该\"${things}\"了哦")
+                        reply("[提醒]\n@${sender.nameCard}\n现在该\"${things}\"了哦")
                     }
                 } catch (e: Exception) {
                     reply("错误")
@@ -162,9 +163,9 @@ object YakumoChatBotMain : KotlinPlugin(
                     val time = it.split("小时后提醒我")[0].toInt()
                     val things = it.split("小时后提醒我")[1]
                     reply(At(sender as Member) + "提醒创建成功了")
-                    YakumoChatBotMain.launch {
+                    MyPluginMain.launch {
                         delay((60 * time * 1000).toLong())
-                        reply("[提醒]\n@${sender.nameCard}}\n现在该\"${things}\"了哦")
+                        reply("[提醒]\n@${sender.nameCard}\n现在该\"${things}\"了哦")
                     }
                 } catch (e: Exception) {
                     reply("错误")
@@ -212,21 +213,31 @@ object YakumoChatBotMain : KotlinPlugin(
 //===================================================================================================================
 // 文游部分
             startsWith(YCCommand.logon, removePrefix = true) {
-                if (it.length > 20) {
-                    reply("你的昵称太长啦")
+                val statement = historyConn.createStatement()
+                val rSet = statement.executeQuery("SELECT Id FROM playerDate")
+                while (rSet.next()) {
+                    YCDate.playerCanLogon.add(rSet.getLong(1))
+                }
+                if (sender.id in YCDate.playerCanLogon) {
+                    reply(" 你已经注册过了！")
+                    statement.close()
                 } else {
-                    val statement = historyConn.createStatement()
-                    statement.executeQuery("INSERT INTO playerDate VALUES (${sender.id}, '${it}', 20, 0.00, 1, 0)")
-                    logger.debug("register player ${sender.id},niki${it}")
+                    if (it.length > 20) {
+                        reply("你的昵称太长啦")
+                    } else {
+                        statement.executeUpdate("INSERT  INTO playerDate VALUES (${sender.id}, 20, 0, 1, 0)")
+                        logger.info("register player ${sender.id},niki${it}")
+                        statement.close()
+                    }
                 }
 
             }
             startsWith(YCCommand.explore, removePrefix = true) {
                 val time = YCSetting.coldDown
-                if (!(sender.id in YakumoChatBotMain.YCDate.canExplore)) {
+                if (!(sender.id in MyPluginMain.YCDate.canExplore)) {
                     reply("开始探索了！预计需要${time}分钟！")
-                    YakumoChatBotMain.launch {
-                        YakumoChatBotMain.YCDate.canExplore.add(sender.id)
+                    MyPluginMain.launch {
+                        MyPluginMain.YCDate.canExplore.add(sender.id)
                         delay((60 * time * 1000).toLong())
                     }
                 } else {
@@ -234,8 +245,8 @@ object YakumoChatBotMain : KotlinPlugin(
                 }
             }
             startsWith(YCCommand.exploreOver, removePrefix = true) {
-                val size = YakumoChatBotMain.YCExploreDate.scene.size
-                if (!(sender.id in YakumoChatBotMain.YCDate.canExplore)) {
+                val size = MyPluginMain.YCExploreDate.scene.size
+                if (!(sender.id in MyPluginMain.YCDate.canExplore)) {
                     var ran = (1..size).random()
                 }
             }
@@ -265,6 +276,7 @@ object YakumoChatBotMain : KotlinPlugin(
         val botToLongMap: MutableMap<Bot, Long> by value<MutableMap<Long, Long>>().mapKeys(Bot::getInstance, Bot::id)
         val monSignDays: MutableMap<Long, Int?> by value()
         val allSignDays: MutableMap<Long, Int?> by value()
+        val playerCanLogon: MutableList<Long> by value()
     }
 
     object YCExploreDate : AutoSavePluginData("YCExploreDate") {
@@ -294,25 +306,12 @@ object YakumoChatBotMain : KotlinPlugin(
 
     }
 
-    object YCMainCommand : SimpleCommand(
-        YakumoChatBotMain, "YC",
+    /*object YCMainCommand : SimpleCommand(
+        MyPluginMain, "YC",
         description = "YC主指令"
     ) {
-        @Handler
-        suspend fun CommandSender.airing(str: String) { // 函数名随意, 但参数需要按顺序放置.
-
-            if (this.hasPermission(YakumoChatBotMain.PERMISSION_EXECUTE_1)) {
-                sendMessage("你有 ${YakumoChatBotMain.PERMISSION_EXECUTE_1.id} 权限.")
-            } else {
-                sendMessage(
-                    """
-                你没有 ${YakumoChatBotMain.PERMISSION_EXECUTE_1.id} 权限.
-                可以在控制台使用 /permission 管理权限.
-            """.trimIndent()
-                )
-            }
-
-            sendMessage("test")
+        fun CommandSender.cleanSignColdDown(){
+            signList = mutableListOf()
         }
-    }
+    }*/
 }
