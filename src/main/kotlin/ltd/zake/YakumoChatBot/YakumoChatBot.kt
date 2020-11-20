@@ -216,7 +216,7 @@ object YakumoChatBotMain : KotlinPlugin(
                     reply("你的昵称太长啦")
                 } else {
                     val statement = historyConn.createStatement()
-                    statement.executeQuery("INSERT INTO playerDate VALUES (${sender.id}, ${it}, 20, 0.00, 1, 0)")
+                    statement.executeQuery("INSERT INTO playerDate VALUES (${sender.id}, '${it}', 20, 0.00, 1, 0)")
                     logger.debug("register player ${sender.id},niki${it}")
                 }
 
