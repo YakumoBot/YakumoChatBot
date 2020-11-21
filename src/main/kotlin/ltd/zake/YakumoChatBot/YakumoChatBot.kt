@@ -5,7 +5,7 @@ package ltd.zake.YakumoChatBot
 import com.google.auto.service.AutoService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import ltd.zake.YakumoChatBot.MyPluginMain.YCDate.signList
+import ltd.zake.YakumoChatBot.MyPluginMain.YCData.signList
 import ltd.zake.YakumoChatBot.tool.SqlStorage
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.console.data.AutoSavePluginConfig
@@ -67,7 +67,7 @@ object MyPluginMain : KotlinPlugin(
     val bot = Bot(YCSetting.qqID, YCSetting.password)
 
     fun regMonSignUser(id: Long, days: Int?) {
-        var signMap = YCDate.monSignDays
+        var signMap = YCData.monSignDays
         if (!signMap.containsKey(id)) {
             signMap[id] = 1
         } else if (signMap.containsKey(id)) {
@@ -79,7 +79,7 @@ object MyPluginMain : KotlinPlugin(
 
 
     fun regAllSignUser(id: Long, days: Int?) {
-        var signMap = YCDate.allSignDays
+        var signMap = YCData.allSignDays
         if (!signMap.containsKey(id)) {
             signMap[id] = 1
         } else if (signMap.containsKey(id)) {
@@ -92,7 +92,7 @@ object MyPluginMain : KotlinPlugin(
     fun cleanMonSign() {
         val nowTime = SimpleDateFormat("ddHHmm").format(System.currentTimeMillis())
         if (nowTime == "010005") {
-            YCDate.monSignDays.clear()
+            YCData.monSignDays.clear()
         }
     }
 
@@ -106,14 +106,16 @@ object MyPluginMain : KotlinPlugin(
 
     override fun onEnable() {
 
+        //var rsPlayerInfo:String
+
         YCSetting.reload() // 从数据库自动读取配置实例
-        YCDate.reload()
-        YCExploreDate.reload()
+        YCData.reload()
+        YCExploreData.reload()
         YCCommand.reload()
 //=====================================================================================================================
         Class.forName(DriveName)//加载驱动,连接sqlite的jdbc
         val historyConn: Connection =
-            DriverManager.getConnection("jdbc:sqlite:C:\\Users\\Public\\Documents\\botDate.db3")
+            DriverManager.getConnection("jdbc:sqlite:C:\\Users\\Public\\Documents\\botData.db3")
 //======================================================================================================================
         logger.info { "Hi: ${YCSetting.name}" }
         logger.info {
@@ -203,13 +205,17 @@ object MyPluginMain : KotlinPlugin(
             }
             startsWith(YCCommand.sign, removePrefix = true) {
                 val user = sender.id
+                val statement = historyConn.createStatement()
                 if (!(user in signList)) {
-                    regAllSignUser(user, YCDate.allSignDays[user])
-                    regMonSignUser(user, YCDate.monSignDays[user])
-                    val monNowDays = YCDate.monSignDays[user]
-                    val allNowDays = YCDate.allSignDays[user]
+                    regAllSignUser(user, YCData.allSignDays[user])
+                    regMonSignUser(user, YCData.monSignDays[user])
+                    val monNowDays = YCData.monSignDays[user]
+                    val allNowDays = YCData.allSignDays[user]
                     signList.add(user)
-                    reply("@${sender.nameCard}\n签到成功！\n累计签到:${allNowDays}\n本月签到:${monNowDays}")
+                    val rMoney = (-2..8).random()
+                    val money = 20 + rMoney
+                    reply("@${sender.nameCard}\n签到成功！\n累计签到:${allNowDays}\n本月签到:${monNowDays}\n${YCExploreData.money}+${money}")
+                    Sql.upDateDate(statement, "playerData", "Money", "${money}", "Id=${sender.id}")
                 } else {
                     reply("@${sender.nameCard}你今天已经签到过了！")
                 }
@@ -218,19 +224,19 @@ object MyPluginMain : KotlinPlugin(
 // 文游部分
             startsWith(YCCommand.logon, removePrefix = true) {
                 val statement = historyConn.createStatement()
-                val rSet = Sql.readSqlDate(statement, "Id", "playerDate")
+                val rSet = Sql.readSqlData(statement, "Id", "playerData")
                 while (rSet.next()) {
-                    YCDate.playerCanLogon.add(rSet.getLong(1))
+                    YCData.playerCanLogon.add(rSet.getLong(1))
                 }
-                if (sender.id in YCDate.playerCanLogon) {
+                if (sender.id in YCData.playerCanLogon) {
                     reply(" 你已经注册过了！")
                     statement.close()
                 } else {
                     if (it.length > 20) {
                         reply("你的昵称太长啦")
                     } else {
-                        //statement.executeUpdate("INSERT  INTO playerDate VALUES (${sender.id}, 20, 0, 1, 0)")
-                        Sql.writeSqlDate(statement, "playerDate", "${sender.id}, 20, 0, 1, 0")
+                        val value = "${sender.id}, '${it}', 20, 20, 0.0, 10, 1, 0"
+                        Sql.writeSqlData(statement, "playerData", value)
                         logger.info("register player ${sender.id},niki${it}")
                         statement.close()
                     }
@@ -239,10 +245,10 @@ object MyPluginMain : KotlinPlugin(
             }
             startsWith(YCCommand.explore, removePrefix = true) {
                 val time = YCSetting.coldDown
-                if (!(sender.id in MyPluginMain.YCDate.canExplore)) {
+                if (!(sender.id in MyPluginMain.YCData.canExplore)) {
                     reply("开始探索了！预计需要${time}分钟！")
                     MyPluginMain.launch {
-                        MyPluginMain.YCDate.canExplore.add(sender.id)
+                        MyPluginMain.YCData.canExplore.add(sender.id)
                         delay((60 * time * 1000).toLong())
                     }
                 } else {
@@ -250,9 +256,30 @@ object MyPluginMain : KotlinPlugin(
                 }
             }
             startsWith(YCCommand.exploreOver, removePrefix = true) {
-                val size = MyPluginMain.YCExploreDate.scene.size
-                if (!(sender.id in MyPluginMain.YCDate.canExplore)) {
+                val size = MyPluginMain.YCExploreData.scene.size
+                if (!(sender.id in MyPluginMain.YCData.canExplore)) {
                     var ran = (1..size).random()
+                }
+            }
+            startsWith(YCCommand.info, removePrefix = true) {
+                val statement = historyConn.createStatement()
+                val rSet = Sql.readSqlData(statement, "playerData", "Id=${sender.id}", true)
+                MyPluginMain.launch {
+                    while (rSet.next()) {
+                        reply(
+                            """
+                                ${sender.nameCard}的信息
+                                玩家信息:
+                                游戏昵称:${rSet.getString(2)}
+                                等级:Lv${rSet.getInt(7)}
+                                生命:${rSet.getInt(3)}/${rSet.getInt(4)}
+                                攻击力:${rSet.getInt(6)}
+                                护甲:${rSet.getInt(5)}
+                                ${YCExploreData.money}:${rSet.getInt(8)}
+                            """.trimIndent()
+                        )
+                    }
+                    statement.close()
                 }
             }
 //===================================================================================================================
@@ -263,7 +290,7 @@ object MyPluginMain : KotlinPlugin(
 
     // 定义插件数据
 // 插件
-    object YCDate : AutoSavePluginData("YCDate") {
+    object YCData : AutoSavePluginData("YCData") {
         var list: MutableList<String> by value(mutableListOf("a", "b")) // mutableListOf("a", "b") 是初始值, 可以省略
         var long: Long by value(0L) // 允许 var
         var int by value(0) // 可以使用类型推断, 但更推荐使用 `var long: Long by value(0)` 这种定义方式.
@@ -284,8 +311,9 @@ object MyPluginMain : KotlinPlugin(
         val playerCanLogon: MutableList<Long> by value()
     }
 
-    object YCExploreDate : AutoSavePluginData("YCExploreDate") {
-        val scene: MutableList<String> by value()
+    object YCExploreData : AutoSavePluginData("YCExploreData") {
+        val scene: MutableMap<Int, String> by value()
+        val money: String by value("春点")
     }
 
 
@@ -308,6 +336,7 @@ object MyPluginMain : KotlinPlugin(
         val explore by value(".探索")
         val exploreOver by value(".整理探索结果")
         val logon by value(".开始冒险")
+        val info by value(".info")
 
     }
 
@@ -319,4 +348,5 @@ object MyPluginMain : KotlinPlugin(
             signList = mutableListOf()
         }
     }*/
+    //TODO:添加管理指令
 }
