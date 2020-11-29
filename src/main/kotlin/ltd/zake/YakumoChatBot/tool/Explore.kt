@@ -1,10 +1,10 @@
 package ltd.zake.YakumoChatBot.tool
 
-import ltd.zake.YakumoChatBot.MyPluginMain
+import ltd.zake.YakumoChatBot.YCPluginMain
 
 //FIXME:未完成，有bug
 open class Explore {
-    val YCExploreDate = MyPluginMain.YCExploreData
+    val YCExploreDate = YCPluginMain.YCExploreData
     fun exploreOver(id: Int, QQid: Long) {
         var output: String
         when (id) {
