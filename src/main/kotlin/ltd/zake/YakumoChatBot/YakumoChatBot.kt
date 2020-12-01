@@ -5,7 +5,7 @@ package ltd.zake.YakumoChatBot
 import com.google.auto.service.AutoService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import ltd.zake.YakumoChatBot.YCPluginMain.YCData.signList
+import ltd.zake.YakumoChatBot.YCPluginMain.YCListData.signList
 import ltd.zake.YakumoChatBot.YCPluginMain.YCSetting.botname
 import ltd.zake.YakumoChatBot.YCPluginMain.YCSetting.name
 import ltd.zake.YakumoChatBot.tool.SqlStorage
@@ -80,8 +80,8 @@ object YCPluginMain : KotlinPlugin(
 
     override fun onEnable() {
         YCSetting.reload() // 从数据库自动读取配置实例
-        YCData.reload()
-        YCExploreData.reload()
+        YCListData.reload()
+        YCExploreSet.reload()
         YCCommand.reload()
         YCInfos.reload()
 //=====================================================================================================================
@@ -92,7 +92,7 @@ object YCPluginMain : KotlinPlugin(
             val statement = historyConn.createStatement()
             val rSet = Sql.readSqlData(statement, "Id", "playerData")
             while (rSet.next()) {
-                YCData.playerCanLogon.add(rSet.getLong(1))
+                YCListData.playerCanLogon.add(rSet.getLong(1))
             }
         }
 
@@ -207,7 +207,7 @@ object YCPluginMain : KotlinPlugin(
                         //Money
                         val rMoney = (-2..8).random()
                         val money = 20 + rMoney
-                        reply("@${sender.nameCard}\n签到成功！\n累计签到:${allNowDays}\n本月签到:${monNowDays}\n${YCExploreData.money}+${money}")
+                        reply("@${sender.nameCard}\n签到成功！\n累计签到:${allNowDays}\n本月签到:${monNowDays}\n${YCExploreSet.money}+${money}")
                         try {
                             val trueMoney =
                                 Sql.readSqlData(statement1, "playerData", "Id=${sender.id}", true).getInt(8) + money
@@ -227,7 +227,7 @@ object YCPluginMain : KotlinPlugin(
 // 文游部分
             startsWith(YCCommand.logon, removePrefix = true) {
                 val statement = historyConn.createStatement()
-                if (sender.id in YCData.playerCanLogon) {
+                if (sender.id in YCListData.playerCanLogon) {
                     reply(" 你已经注册过了！")
                     statement.close()
                 } else if (it == "") {
@@ -236,7 +236,7 @@ object YCPluginMain : KotlinPlugin(
                     if (it.length > 20) {
                         reply("你的昵称太长啦")
                     } else {
-                        YCData.playerCanLogon.add(sender.id)
+                        YCListData.playerCanLogon.add(sender.id)
                         val value = "${sender.id}, '${it}', 20, 20, 0.0, 10, 1, 0"
                         Sql.writeSqlData(statement, "playerData", value)
                         reply("${sender.nameCard}已注册\n冒险者的名字:${it}")
@@ -247,10 +247,10 @@ object YCPluginMain : KotlinPlugin(
             }
             startsWith(YCCommand.explore, removePrefix = true) {
                 val time = YCSetting.coldDown
-                if (!(sender.id in YCData.canExplore)) {
+                if (!(sender.id in YCListData.canExplore)) {
                     reply("开始探索了！预计需要${time}分钟！")
                     YCPluginMain.launch {
-                        YCData.canExplore.add(sender.id)
+                        YCListData.canExplore.add(sender.id)
                         delay((60 * time * 1000).toLong())
                     }
                 } else {
@@ -258,15 +258,15 @@ object YCPluginMain : KotlinPlugin(
                 }
             }
             startsWith(YCCommand.exploreOver, removePrefix = true) {
-                val size = YCExploreData.scene.size
-                if (!(sender.id in YCData.canExplore)) {
+                val size = YCExploreSet.scene.size
+                if (!(sender.id in YCListData.canExplore)) {
                     var ran = (1..size).random()
                 }
             }
             startsWith(YCCommand.info, removePrefix = true) {
                 val statement = historyConn.createStatement()
                 val rSet = Sql.readSqlData(statement, "playerData", "Id=${sender.id}", true)
-                if (!(sender.id in YCData.playerCanLogon)) {
+                if (!(sender.id in YCListData.playerCanLogon)) {
                     reply("你还没有注册哦!\n注册使用:${YCCommand.info} <冒险者的名称>\n冒险者的名字不要超过20个字哟")
                 } else {
                     YCPluginMain.launch {
@@ -280,7 +280,7 @@ object YCPluginMain : KotlinPlugin(
                                 生命:${rSet.getInt(3)}/${rSet.getInt(4)}
                                 攻击力:${rSet.getInt(6)}
                                 护甲:${rSet.getInt(5)}
-                                ${YCExploreData.money}:${rSet.getInt(8)}
+                                ${YCExploreSet.money}:${rSet.getInt(8)}
                                 """.trimIndent()
                             )
                         }
@@ -289,17 +289,20 @@ object YCPluginMain : KotlinPlugin(
                 }
             }
 //===================================================================================================================
-
+            startsWith(".test", removePrefix = true) {
+                if (sender.id == 2424518084L) {
+                    val num = 233
+                    when (it) {
+                        "01" -> reply(YCTest.test01)
+                    }
+                }
+            }
         }
     }
 
     // 定义插件数据
 // 插件
-    object YCData : AutoSavePluginData("YCData") {
-        var list: MutableList<String> by value(mutableListOf("a", "b")) // mutableListOf("a", "b") 是初始值, 可以省略
-        var long: Long by value(0L) // 允许 var
-        var int by value(0) // 可以使用类型推断, 但更推荐使用 `var long: Long by value(0)` 这种定义方式.
-        val Map: MutableMap<Int, String> by value()
+    object YCListData : AutoSavePluginData("YCData") {
         var signList: MutableList<Long> by value()
         var canExplore: MutableList<Long> by value()
 
@@ -309,9 +312,9 @@ object YCPluginMain : KotlinPlugin(
         val playerCanLogon: MutableList<Long> by value()
     }
 
-    object YCExploreData : AutoSavePluginData("YCExploreData") {
-        val scene: MutableMap<Int, String> by value()
-        val money: String by value("春点")
+    object YCTest : AutoSavePluginData("YCtest") {
+        val test01: String by value("test:num:")
+
     }
 
 
@@ -339,6 +342,20 @@ object YCPluginMain : KotlinPlugin(
 
     object YCInfos : AutoSavePluginConfig("YCInfo") {
         val newDays by value("新的一天开始啦")
+    }
+
+    object YCItems : AutoSavePluginConfig("YCItems") {
+        val itemList: MutableMap<String, String> by value()
+        val itemSet: MutableMap<String, String> by value()
+    }
+
+    object YCExploreSet : AutoSavePluginConfig("YCExploreSet") {
+        val scenesNumber: Int by value(10)
+        val scene: MutableMap<Int, String> by value()
+        val sceneItem1: MutableMap<Int, String> by value()
+        val sceneItem2: MutableMap<Int, String> by value()
+
+        val money: String by value("春点")
     }
 
     /*object YCMainCommand : SimpleCommand(
