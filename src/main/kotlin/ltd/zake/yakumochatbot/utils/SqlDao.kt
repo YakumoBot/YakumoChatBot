@@ -1,9 +1,9 @@
-package ltd.zake.YakumoChatBot.tool
+package ltd.zake.yakumochatbot.utils
 
 import java.sql.ResultSet
 import java.sql.Statement
 
-open class SqlStorage {
+class SqlDao {
     /**
      * 搜索全表
      */
@@ -32,9 +32,9 @@ open class SqlStorage {
         return statement.executeQuery("SELECT ${list} FROM ${table} WHERE ${where}")
     }
 
-    fun writeSqlData(statement: Statement, table: String, value: String) {
-        var VALUE = stringBulider(value.toString())
-        statement.executeUpdate("INSERT  INTO ${table} VALUES (${VALUE})")
+    fun writeSqlData(statement: Statement, table: String, vararg args: Any) {
+        var sb = args.contentToString().replace("[", "").replace("]", "")
+        statement.executeUpdate("INSERT  INTO ${table} VALUES ($sb)")
     }
 
     fun updateDate(statement: Statement, table: String, list: String, value: String, where: String) {

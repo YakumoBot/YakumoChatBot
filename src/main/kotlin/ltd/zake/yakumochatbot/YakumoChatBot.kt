@@ -1,14 +1,14 @@
 @file:Suppress("unused")
 
-package ltd.zake.YakumoChatBot
+package ltd.zake.yakumochatbot
 
 import com.google.auto.service.AutoService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import ltd.zake.YakumoChatBot.YCPluginMain.YCListData.signList
-import ltd.zake.YakumoChatBot.YCPluginMain.YCSetting.botname
-import ltd.zake.YakumoChatBot.YCPluginMain.YCSetting.name
-import ltd.zake.YakumoChatBot.tool.SqlStorage
+import ltd.zake.yakumochatbot.YCPluginMain.YCListData.signList
+import ltd.zake.yakumochatbot.YCPluginMain.YCSetting.botname
+import ltd.zake.yakumochatbot.YCPluginMain.YCSetting.name
+import ltd.zake.yakumochatbot.utils.SqlDao
 import net.mamoe.mirai.console.data.AutoSavePluginConfig
 import net.mamoe.mirai.console.data.AutoSavePluginData
 import net.mamoe.mirai.console.data.value
@@ -16,7 +16,6 @@ import net.mamoe.mirai.console.permission.PermissionService
 import net.mamoe.mirai.console.plugin.jvm.JvmPlugin
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
-import net.mamoe.mirai.contact.Member
 import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.utils.info
@@ -47,7 +46,7 @@ import java.text.SimpleDateFormat
 */
 
 val DriveName: String = "org.sqlite.JDBC"
-val Sql = SqlStorage()
+val Sql = SqlDao()
 
 @AutoService(JvmPlugin::class)
 object YCPluginMain : KotlinPlugin(
@@ -79,7 +78,8 @@ object YCPluginMain : KotlinPlugin(
     }
 
     override fun onEnable() {
-        YCSetting.reload() // 从数据库自动读取配置实例
+        // 从数据库自动读取配置实例
+        YCSetting.reload()
         YCListData.reload()
         YCExploreSet.reload()
         YCCommand.reload()
@@ -87,7 +87,7 @@ object YCPluginMain : KotlinPlugin(
 //=====================================================================================================================
         Class.forName("org.sqlite.JDBC")//加载驱动,连接sqlite的jdbc
         val historyConn: Connection =
-            DriverManager.getConnection("jdbc:sqlite:C:\\Users\\Public\\Documents\\botData.db3")
+            DriverManager.getConnection("jdbc:sqlite:data\\botData.db3")
         YCPluginMain.launch {
             val statement = historyConn.createStatement()
             val rSet = Sql.readSqlData(statement, "Id", "playerData")
@@ -133,10 +133,10 @@ object YCPluginMain : KotlinPlugin(
                 try {
                     val time = it.split("分钟后提醒我")[0].toInt()
                     val things = it.split("分钟后提醒我")[1]
-                    reply(At(sender as Member) + "提醒创建成功了")
+                    reply(At(sender) + "提醒创建成功了")
                     YCPluginMain.launch {
                         delay((60 * time * 1000 * 3600).toLong())
-                        reply("[提醒]\n@${sender.nameCard}\n现在该\"${things}\"了哦")
+                        reply(At(sender) + "[提醒]\n现在该\"${things}\"了哦")
                     }
                 } catch (e: Exception) {
                     reply("错误")
@@ -146,10 +146,10 @@ object YCPluginMain : KotlinPlugin(
                 try {
                     val time = it.split("小时后提醒我")[0].toInt()
                     val things = it.split("小时后提醒我")[1]
-                    reply(At(sender as Member) + "提醒创建成功了")
+                    reply(At(sender) + "提醒创建成功了")
                     YCPluginMain.launch {
                         delay((60 * time * 1000).toLong())
-                        reply("[提醒]\n@${sender.nameCard}\n现在该\"${things}\"了哦")
+                        reply(At(sender) + "[提醒]\n现在该\"${things}\"了哦")
                     }
                 } catch (e: Exception) {
                     reply("错误")
@@ -191,8 +191,7 @@ object YCPluginMain : KotlinPlugin(
                         signList.add(user)
 //======================================================================================================================
                         if (CAN_SIGN == 0) {
-                            val value = "${user},1,1"
-                            Sql.writeSqlData(statement0, "signMap", value)
+                            Sql.writeSqlData(statement0, "signMap", user, 1, 1)
                         } else if (CAN_SIGN == 1) {
                             val regAllDays = Sql.readSqlData(statement0, "signMap", "Id=${user}", true).getInt(3)
                             val regMonDays = Sql.readSqlData(statement0, "signMap", "Id=${user}", true).getInt(2)
@@ -207,7 +206,7 @@ object YCPluginMain : KotlinPlugin(
                         //Money
                         val rMoney = (-2..8).random()
                         val money = 20 + rMoney
-                        reply("@${sender.nameCard}\n签到成功！\n累计签到:${allNowDays}\n本月签到:${monNowDays}\n${YCExploreSet.money}+${money}")
+                        reply(At(sender) + "\n签到成功！\n累计签到:${allNowDays}\n本月签到:${monNowDays}\n${YCExploreSet.money}+${money}")
                         try {
                             val trueMoney =
                                 Sql.readSqlData(statement1, "playerData", "Id=${sender.id}", true).getInt(8) + money
@@ -219,7 +218,7 @@ object YCPluginMain : KotlinPlugin(
                         }
 
                     } else {
-                        reply("@${sender.nameCard}你今天已经签到过了！")
+                        reply(At(sender) + "你今天已经签到过了！")
                     }
                 }
             }
@@ -237,9 +236,8 @@ object YCPluginMain : KotlinPlugin(
                         reply("你的昵称太长啦")
                     } else {
                         YCListData.playerCanLogon.add(sender.id)
-                        val value = "${sender.id}, '${it}', 20, 20, 0.0, 10, 1, 0"
-                        Sql.writeSqlData(statement, "playerData", value)
-                        reply("${sender.nameCard}已注册\n冒险者的名字:${it}")
+                        Sql.writeSqlData(statement, "playerData", sender.id, "\'$it\'", 20, 20, 0.0, 10, 1, 0)
+                        reply(At(sender) + "已注册\n冒险者的名字:${it}")
                         logger.verbose("[${sender.id}]${sender.nameCard}已注册\n冒险者的名字:${it}")
                         statement.close()
                     }
@@ -267,13 +265,13 @@ object YCPluginMain : KotlinPlugin(
                 val statement = historyConn.createStatement()
                 val rSet = Sql.readSqlData(statement, "playerData", "Id=${sender.id}", true)
                 if (!(sender.id in YCListData.playerCanLogon)) {
-                    reply("你还没有注册哦!\n注册使用:${YCCommand.info} <冒险者的名称>\n冒险者的名字不要超过20个字哟")
+                    reply("你还没有注册哦!\n注册使用:${YCCommand.logon} <冒险者的名称>\n冒险者的名字不要超过20个字哟")
                 } else {
                     YCPluginMain.launch {
                         while (rSet.next()) {
-                            reply(
-                                """
-                                ${sender.nameCard}的信息
+                            reply(At(sender) +
+                                    """
+                                的信息
                                 玩家信息:
                                 游戏昵称:${rSet.getString(2)}
                                 等级:Lv${rSet.getInt(7)}
@@ -289,14 +287,6 @@ object YCPluginMain : KotlinPlugin(
                 }
             }
 //===================================================================================================================
-            startsWith(".test", removePrefix = true) {
-                if (sender.id == 2424518084L) {
-                    val num = 233
-                    when (it) {
-                        "01" -> reply(YCTest.test01)
-                    }
-                }
-            }
         }
     }
 
@@ -311,12 +301,6 @@ object YCPluginMain : KotlinPlugin(
             Bot::id)*/
         val playerCanLogon: MutableList<Long> by value()
     }
-
-    object YCTest : AutoSavePluginData("YCtest") {
-        val test01: String by value("test:num:")
-
-    }
-
 
     // 定义一个配置. 所有属性都会被追踪修改, 并自动保存.
 // 配置是插件与用户交互的接口, 但不能用来保存插件的数据.
