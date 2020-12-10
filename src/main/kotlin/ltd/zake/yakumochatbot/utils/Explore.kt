@@ -7,7 +7,6 @@ import ltd.zake.yakumochatbot.YCPluginMain.YCListData.deadList
 import java.sql.ResultSet
 import java.sql.Statement
 
-//FIXME:未完成，有bug
 class Explore(val statement: Statement) {
     val Sql = SqlDao()
     fun power(base: Int, powerRaised: Int): Int {
@@ -27,6 +26,7 @@ class Explore(val statement: Statement) {
         val Level = Sql.readSqlData(statement, "Level", "playerData", "Id = ${Id}").getInt(1)
         val nowExp = Sql.readSqlData(statement, "Exp", "playerData", "Id = ${Id}").getInt(1) + add
         val nowHealth = Sql.readSqlData(statement, "Health", "playerData", "Id = ${Id}").getInt(1)
+        val nowAttack = Sql.readSqlData(statement, "Attack", "playerData", "Id = ${Id}").getInt(1)
         val maxExp = maxExp(Id)
         var replay: String = ""
         while (true) {
@@ -40,6 +40,7 @@ class Explore(val statement: Statement) {
                 Sql.updateDate(statement, "playerData", "Level", "${nowLevel}", "Id = ${Id}")
                 Sql.updateDate(statement, "playerData", "Health", "${nowHealth + 15}", "Id = ${Id}")
                 Sql.updateDate(statement, "playerData", "MaxHealth", "${nowHealth + 15}", "Id = ${Id}")
+                Sql.updateDate(statement, "playerData", "Attack", "${nowAttack + 10}", "Id = ${Id}")
                 replay = "Level Up!"
             } else if (nowExp < maxExp) {
                 Sql.updateDate(statement, "playerData", "Exp", "${nowExp}", "Id = ${Id}")
