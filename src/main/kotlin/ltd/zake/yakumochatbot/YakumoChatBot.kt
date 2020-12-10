@@ -212,8 +212,8 @@ object YCPluginMain : KotlinPlugin(
                         val monNowDays = Sql.readSqlData(statement0, "MonSign", "signMap", "Id=${user}").getInt(1)
                         //makeSpoils
                         val spoils = explore.makeSpoils(statement1, sender.id)
-                        val money = spoils[1]
-                        val addExp = spoils[2]
+                        val money = spoils[0]
+                        val addExp = spoils[1]
                         reply(At(sender) + "\n签到成功！\n累计签到:${allNowDays}\n本月签到:${monNowDays}\n${botMoney}+${money}\n经验+${addExp}")
                         try {
                             val trueMoney =
@@ -271,9 +271,10 @@ object YCPluginMain : KotlinPlugin(
                 }
             }
             startsWith(YCCommand.info, removePrefix = true) {
-                val statement = historyConn.createStatement()
-                val explore = Explore(statement)
-                val rSet = Sql.readSqlData(statement, "playerData", "Id=${sender.id}", true)
+                val statement0 = historyConn.createStatement()
+                val statement1 = historyConn.createStatement()
+                val explore = Explore(statement1)
+                val rSet = Sql.readSqlData(statement0, "playerData", "Id = ${sender.id}", true)
                 if (sender.id !in YCListData.playerCanLogon) {
                     reply("你还没有注册哦!\n注册使用:${YCCommand.logon} <冒险者的名称>\n冒险者的名字不要超过20个字哟")
                 } else {
@@ -285,7 +286,7 @@ object YCPluginMain : KotlinPlugin(
                                 玩家信息:
                                 游戏昵称:${rSet.getString(2)}
                                 等级:Lv${rSet.getInt(8)}
-                                经验:${rSet.getInt(3)}/${explore.maxExp(statement, sender.id)}
+                                经验:${rSet.getInt(3)}/${explore.maxExp(sender.id)}
                                 生命:${rSet.getInt(4)}/${rSet.getInt(5)}
                                 攻击力:${rSet.getInt(7)}
                                 护甲:${rSet.getInt(6)}
@@ -293,7 +294,8 @@ object YCPluginMain : KotlinPlugin(
                                 """.trimIndent()
                             )
                         }
-                        statement.close()
+                        statement0.close()
+                        statement1.close()
                     }
                 }
             }
@@ -320,6 +322,8 @@ object YCPluginMain : KotlinPlugin(
                                 val targetSet = Sql.readSqlData(statement, "Nick", "playerData", "Id=${target.id}")
                                 if (target.id in deadList) {
                                     reply("不能和${targetNick}pvp啦~\n他好像还没复活...")
+                                } else if (target.id !in YCListData.playerCanLogon) {
+                                    reply("不能和${target.nameCard}pvp啦~\n他好像还没注册哦")
                                 } else if (sender.id == target.id) {
                                     reply("${senderNick}不可以伤害自己啦...")
                                 } else {
@@ -339,6 +343,7 @@ object YCPluginMain : KotlinPlugin(
                                                 "Id=${target.id}")
                                             val str = explore.levelUp(addExp, target.id)
                                             reply(str)
+                                            statement.close()
                                             break
                                         }
                                         if (targetSet.getInt(4) <= 0) {
@@ -354,6 +359,7 @@ object YCPluginMain : KotlinPlugin(
                                                 "Id=${sender.id}")
                                             val str = explore.levelUp(addExp, sender.id)
                                             reply(str)
+                                            statement.close()
                                             break
                                         }
                                         val pvpAttack = explore.pvpAttack(senderSet, targetSet)
@@ -382,7 +388,6 @@ object YCPluginMain : KotlinPlugin(
                                         }*/
                                         delay(2000)
                                     }
-                                    statement.close()
                                 }
                             } else {
                                 reply("${senderNick}的pvp请求已取消")

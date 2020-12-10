@@ -17,7 +17,7 @@ class Explore(val statement: Statement) {
             return 1
     }
 
-    fun maxExp(statement: Statement, Id: Long): Int {
+    fun maxExp(Id: Long): Int {
         val level = Sql.readSqlData(statement, "Level", "playerData", "Id = ${Id}").getInt(1)
         val maxExp: Int = (level * 16) + power(level, 2) + 33
         return maxExp
@@ -27,7 +27,7 @@ class Explore(val statement: Statement) {
         val Level = Sql.readSqlData(statement, "Level", "playerData", "Id = ${Id}").getInt(1)
         val nowExp = Sql.readSqlData(statement, "Exp", "playerData", "Id = ${Id}").getInt(1) + add
         val nowHealth = Sql.readSqlData(statement, "Health", "playerData", "Id = ${Id}").getInt(1)
-        val maxExp = maxExp(statement, Id)
+        val maxExp = maxExp(Id)
         var replay: String = ""
         while (true) {
             if (Level == 100) {
@@ -70,8 +70,8 @@ class Explore(val statement: Statement) {
 
     fun makeSpoils(statement: Statement, id: Long): List<Int> {
         val Money = 20 + (-2..8).random()
-        val addExp = ((maxExp(statement, id) + 5) / 8) + (4..10).random()
-        val returnS = listOf<Int>(Money, addExp)
+        val addExp = ((maxExp(id) + 5) / 8) + (4..10).random()
+        val returnS = listOf(Money, addExp)
         return returnS
     }
 
