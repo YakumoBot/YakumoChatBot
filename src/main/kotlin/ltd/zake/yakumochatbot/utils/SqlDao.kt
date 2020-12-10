@@ -32,15 +32,24 @@ class SqlDao {
         return statement.executeQuery("SELECT ${list} FROM ${table} WHERE ${where}")
     }
 
+    /**
+     * 插入一段信息
+     */
     fun writeSqlData(statement: Statement, table: String, vararg args: Any) {
         var sb = args.contentToString().replace("[", "").replace("]", "")
         statement.executeUpdate("INSERT  INTO ${table} VALUES ($sb)")
     }
 
+    /**
+     * 更新指定列的指定行的信息
+     */
     fun updateDate(statement: Statement, table: String, list: String, value: String, where: String) {
         statement.executeUpdate("UPDATE ${table} SET ${list} = ${value} WHERE ${where} ")
     }
 
+    /**
+     * 更新指定列的信息
+     */
     fun updateDate(statement: Statement, table: String, list: String, value: String) {
         statement.executeUpdate("UPDATE ${table} SET ${list} = ${value}")
     }

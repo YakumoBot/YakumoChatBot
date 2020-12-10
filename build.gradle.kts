@@ -17,7 +17,7 @@ apply(plugin = "com.github.johnrengelman.shadow")
 apply(plugin = "java")
 
 group = "ltd.zake"
-version = "1.0.1-20Dec10a"
+version = "1.0.1-20Dec10b"
 
 
 repositories {
