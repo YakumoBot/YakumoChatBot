@@ -10,6 +10,7 @@ import ltd.zake.yakumochatbot.YCPluginMain.YCListData.deadList
 import ltd.zake.yakumochatbot.YCPluginMain.YCListData.signList
 import ltd.zake.yakumochatbot.YCPluginMain.YCSetting.botname
 import ltd.zake.yakumochatbot.YCPluginMain.YCSetting.name
+import ltd.zake.yakumochatbot.business.PvpAttack
 import ltd.zake.yakumochatbot.utils.ExploreUtils
 import ltd.zake.yakumochatbot.utils.SqlDao
 import net.mamoe.mirai.console.data.AutoSavePluginConfig
@@ -57,7 +58,7 @@ val Sql = SqlDao()
 object YCPluginMain : KotlinPlugin(
     JvmPluginDescription(
         "ltd.zake.YakumoChatBot",
-        "1.0.1-20Dec25a"
+        "1.0.1-20Dec25b"
     )
 ) {
     val PERMISSION_EXECUTE_1 by lazy {
@@ -92,12 +93,16 @@ object YCPluginMain : KotlinPlugin(
 //=====================================================================================================================
         Class.forName("org.sqlite.JDBC")//加载驱动,连接sqlite的jdbc
         val historyConn: Connection =
-            DriverManager.getConnection("jdbc:sqlite:botData.db3")
+            DriverManager.getConnection("jdbc:sqlite:data/botData.db3")
         YCPluginMain.launch {
             val statement = historyConn.createStatement()
             val rSet = Sql.readSqlData(statement, "Id", "playerData")
             while (rSet.next()) {
-                YCListData.playerCanLogon.add(rSet.getLong(1))
+                if (rSet.getLong(1) in YCListData.playerCanLogon) {
+                    continue
+                } else {
+                    YCListData.playerCanLogon.add(rSet.getLong(1))
+                }
             }
         }
 
@@ -308,25 +313,25 @@ object YCPluginMain : KotlinPlugin(
             }
 
 //======================================================================================================================
-            Regex(".pvp.*?") matching {
+            //Regex(".pvp.*?") matching {
+            startsWith(YCCommand.pvp, removePrefix = true) {
                 YCPluginMain.launch {
                     if (sender.id !in YCListData.playerCanLogon) {
                         reply("你还没有注册哦!\n注册使用:${YCCommand.logon} <冒险者的名称>\n冒险者的名字不要超过20个字哟")
                     } else {
-                        val statement = historyConn.createStatement()
-                        val explore = ExploreUtils()
+
+                        val statement0 = historyConn.createStatement()
                         val senderNick =
-                            Sql.readSqlData(statement, "Nick", "playerData", "Id=${sender.id}").getString(1)
+                            Sql.readSqlData(statement0, "Nick", "playerData", "Id=${sender.id}").getString(1)
                         if (sender.id in deadList) {
-                            reply("${senderNick}还没有复活哦...\n可能进行不了pvp啦...\n使用命令\"#info\"查看自己的复活时间吧~")
+                            /*使用命令"#info"查看自己的复活时间吧~*/reply("${senderNick}还没有复活哦...\n可能进行不了pvp啦...")
                         } else {
                             reply("${senderNick}是否要进行友尽(x)pvp模式呢?[y/n]")
                             if (nextMessage().contentToString() == "y") {
                                 reply("${senderNick}请艾特出要pvp的目标吧~")
-                                var target = nextMessage { message.any(At) }[At]!!.asMember()
-                                val targetNick = Sql.readSqlData(statement, "Nick", "playerData", "Id=${target.id}")
-                                val senderSet = Sql.readSqlData(statement, "Nick", "playerData", "Id=${sender.id}")
-                                val targetSet = Sql.readSqlData(statement, "Nick", "playerData", "Id=${target.id}")
+                                val target = nextMessage { message.any(At) }[At]!!.asMember()
+                                val targetNick =
+                                    Sql.readSqlData(statement0, "Nick", "playerData", "Id=${target.id}").getString(1)
                                 if (target.id in deadList) {
                                     reply("不能和${targetNick}pvp啦~\n他好像还没复活...")
                                 } else if (target.id !in YCListData.playerCanLogon) {
@@ -334,67 +339,13 @@ object YCPluginMain : KotlinPlugin(
                                 } else if (sender.id == target.id) {
                                     reply("${senderNick}不可以伤害自己啦...")
                                 } else {
-                                    while (true) {
-                                        if (senderSet.getInt(4) <= 0) {
-                                            explore.setDead(statement, sender.id)
-                                            val (money, addExp) = explore.makeSpoils(statement, target.id)
-                                            reply("${targetNick}获胜啦~\n${botname}奖励${money}${botMoney}~\n春点个数:${
-                                                targetSet.getInt(9)
-                                            }(+${money})")
-                                            Sql.updateDate(statement,
-                                                "playerData",
-                                                "Money",
-                                                "${targetSet.getInt(9) + money}",
-                                                "Id=${target.id}")
-                                            val str = explore.levelUp(statement, addExp, target.id)
-                                            reply(str)
-                                            statement.close()
-                                            break
-                                        }
-                                        if (targetSet.getInt(4) <= 0) {
-                                            explore.setDead(statement, target.id)
-                                            val (money, addExp) = explore.makeSpoils(statement, sender.id)
-                                            reply("${senderNick}获胜啦~\n${botname}奖励${money}春点~\n春点个数:${senderSet.getInt(9)}(+${money})")
-                                            Sql.updateDate(statement,
-                                                "playerData",
-                                                "Money",
-                                                "${senderSet.getInt(9) + money}",
-                                                "Id=${sender.id}")
-                                            val str = explore.levelUp(statement, addExp, sender.id)
-                                            reply(str)
-                                            statement.close()
-                                            break
-                                        }
-                                        //val pvpAttack = explore.pvpAttack(senderSet, targetSet)
-                                        //reply(pvpAttack)
-                                        /*val type = (1..3).random()
-                                        if (type == 1) {
-                                            reply("${senderNick}对${targetNick}造成了0.5倍伤害\n${targetNick}的生命:${nowHP[target.id]}(-${attack[sender.id]!! * 0.5})")
-                                            nowHP[target.id] = (nowHP[target.id]!! - attack[sender.id]!! * 0.5).toLong()
-                                        } else if (type == 2) {
-                                            reply("${senderNick}对${targetNick}造成了1倍伤害\n${targetNick}的生命:${nowHP[target.id]}(-${attack[sender.id]!!})")
-                                            nowHP[target.id] = (nowHP[target.id]!! - attack[sender.id]!!).toLong()
-                                        } else if (type == 3) {
-                                            reply("${senderNick}对${targetNick}造成了1.5倍伤害\n${targetNick}的生命:${nowHP[target.id]}(-${attack[sender.id]!! * 1.5})")
-                                            nowHP[target.id] = (nowHP[target.id]!! - attack[sender.id]!! * 1.5).toLong()
-                                        }
-                                        val type2 = (1..3).random()
-                                        if (type2 == 1) {
-                                            reply("${targetNick}对${senderNick}造成了0.5倍伤害\n${senderNick}的生命:${nowHP[sender.id]}(-${attack[target.id]!! * 0.5})")
-                                            nowHP[sender.id] = (nowHP[sender.id]!! - attack[target.id]!! * 0.5).toLong()
-                                        } else if (type2 == 2) {
-                                            reply("${targetNick}对${senderNick}造成了1倍伤害\n${senderNick}的生命:${nowHP[sender.id]}(-${attack[target.id]!!})")
-                                            nowHP[sender.id] = (nowHP[sender.id]!! - attack[target.id]!!).toLong()
-                                        } else if (type2 == 3) {
-                                            reply("${targetNick}对${senderNick}造成了1.5倍伤害\n${senderNick}的生命:${nowHP[sender.id]}(-${attack[target.id]!! * 1.5})")
-                                            nowHP[sender.id] = (nowHP[sender.id]!! - attack[target.id]!! * 1.5).toLong()
-                                        }*/
-                                        delay(2000)
-                                    }
+                                    val pvpAttack = PvpAttack(historyConn, sender.id, target.id)
+                                    val replyStr = pvpAttack.pvpAttack()
+                                    reply(replyStr)
                                 }
                             } else {
                                 reply("${senderNick}的pvp请求已取消")
-                                statement.close()
+                                statement0.close()
                             }
                         }
                     }
@@ -437,6 +388,7 @@ object YCPluginMain : KotlinPlugin(
         val logon by value(".开始冒险")
         val info by value(".info")
         val type by value(".状态")
+        val pvp by value(".pvp")
 
     }
 

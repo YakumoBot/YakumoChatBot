@@ -2,15 +2,17 @@ package ltd.zake.yakumochatbot.business
 
 import ltd.zake.yakumochatbot.utils.ExploreUtils
 import ltd.zake.yakumochatbot.utils.SqlDao
-import java.sql.Statement
+import java.sql.Connection
 
-class PvpAttack(val statement: Statement, val senderId: Long, val targetId: Long) {
+class PvpAttack(val historyConn: Connection, val senderId: Long, val targetId: Long) {
+    val statement0 = historyConn.createStatement()
+    val statement1 = historyConn.createStatement()
     val Sql = SqlDao()
     val explore = ExploreUtils()
-    val senderSet = Sql.readSqlData(statement, "Nick", "playerData", "Id=${senderId}")
-    val targetSet = Sql.readSqlData(statement, "Nick", "playerData", "Id=${targetId}")
+    val senderSet = Sql.readSqlData(statement0, "playerData", "Id=${senderId}", true)
+    val targetSet = Sql.readSqlData(statement1, "playerData", "Id=${targetId}", true)
     val senderName = senderSet.getString(2)
-    val targetName = senderSet.getString(2)
+    val targetName = targetSet.getString(2)
     var senderHP = senderSet.getInt(4)
     var targetHP = targetSet.getInt(4)
 
@@ -57,7 +59,8 @@ class PvpAttack(val statement: Statement, val senderId: Long, val targetId: Long
             }
             val HP = senderHP
             val overHP = HP - ATK!!
-            val str = "r 1d6=${dice}\n${targetName}对${senderName}造成${atkType}伤害！\n${HP}-${ATK}=${overHP}"
+            val str = "\nr 1d6=${dice}\n${targetName}对${senderName}造成${atkType}伤害！\n${HP}-${ATK}=${overHP}\n"
+            senderHP = overHP
             return Pair(str, overHP)
         }
 
@@ -74,36 +77,38 @@ class PvpAttack(val statement: Statement, val senderId: Long, val targetId: Long
             }
             val HP = targetHP
             val overHP = HP - ATK!!
-            val str = "r 1d6=${dice}\n${senderName}对${targetName}造成${atkType}伤害！\n${HP}-${ATK}=${overHP}"
+            val str = "\nr 1d6=${dice}\n${senderName}对${targetName}造成${atkType}伤害！\n${HP}-${ATK}=${overHP}\n"
+            targetHP = overHP
             return Pair(str, overHP)
         }
 
         fun overBuilder(round: Int, isFinalRound: Boolean): Pair<String, Boolean> {
-            val sb = StringBuilder("==第${round}回合==\n")
+            val sb = StringBuilder("\n==第${round}回合==")
             val (senderStr, senderOverHP) = sender(dice())
+            val win: String
             if (senderOverHP >= 0) {
                 sb.append(senderStr)
-                sb.append("\n===========")
-                Sql.updateDate(statement, "playerData", "Health", "${senderOverHP}", "Id=${senderId}")
+                sb.append("===========")
+                Sql.updateDate(statement0, "playerData", "Health", "${senderOverHP}", "Id=${senderId}")
                 if (senderOverHP <= 0) {
-                    explore.setDead(statement, senderId)
-                    sb.append("${senderName}失败了,胜利者是${targetName}")
+                    explore.setDead(statement0, senderId)
+                    sb.append("\n${senderName}失败了,胜利者是${targetName}")
                     //TODO:战利品配发
                     return Pair(sb.toString(), false)
                 } else {
                     val (targetStr, targetOverHP) = target(dice())
                     if (targetOverHP <= 0) {
-                        explore.setDead(statement, targetId)
-                        sb.append("${targetName}失败了,胜利者是${senderName}")
+                        explore.setDead(statement1, targetId)
+                        sb.append("\n${targetName}失败了,胜利者是${senderName}")
                         //TODO:战利品配发
                         return Pair(sb.toString(), false)
                     } else {
                         sb.append(targetStr)
-                        Sql.updateDate(statement, "playerData", "Health", "${targetOverHP}", "Id=${targetId}")
+                        Sql.updateDate(statement1, "playerData", "Health", "${targetOverHP}", "Id=${targetId}")
                     }
                 }
             } else if (senderOverHP <= 0) {
-                explore.setDead(statement, senderId)
+                explore.setDead(statement0, senderId)
                 sb.append("${senderName}失败了,胜利者是${targetName}")
                 return Pair(sb.toString(), false)
             } else if (isFinalRound || senderHP != 0 || targetHP != 0) {
@@ -137,6 +142,8 @@ class PvpAttack(val statement: Statement, val senderId: Long, val targetId: Long
             //delay(500)
 
         }
+        statement0.close()
+        statement1.close()
         return _replay.toString()
     }
 }
