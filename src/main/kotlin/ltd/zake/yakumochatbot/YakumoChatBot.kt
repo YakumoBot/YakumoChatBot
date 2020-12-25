@@ -10,7 +10,7 @@ import ltd.zake.yakumochatbot.YCPluginMain.YCListData.deadList
 import ltd.zake.yakumochatbot.YCPluginMain.YCListData.signList
 import ltd.zake.yakumochatbot.YCPluginMain.YCSetting.botname
 import ltd.zake.yakumochatbot.YCPluginMain.YCSetting.name
-import ltd.zake.yakumochatbot.utils.Explore
+import ltd.zake.yakumochatbot.utils.ExploreUtils
 import ltd.zake.yakumochatbot.utils.SqlDao
 import net.mamoe.mirai.console.data.AutoSavePluginConfig
 import net.mamoe.mirai.console.data.AutoSavePluginData
@@ -57,7 +57,7 @@ val Sql = SqlDao()
 object YCPluginMain : KotlinPlugin(
     JvmPluginDescription(
         "ltd.zake.YakumoChatBot",
-        "1.0.1-Alphal"
+        "1.0.1-20Dec25a"
     )
 ) {
     val PERMISSION_EXECUTE_1 by lazy {
@@ -92,7 +92,7 @@ object YCPluginMain : KotlinPlugin(
 //=====================================================================================================================
         Class.forName("org.sqlite.JDBC")//加载驱动,连接sqlite的jdbc
         val historyConn: Connection =
-            DriverManager.getConnection("jdbc:sqlite:data\\botData.db3")
+            DriverManager.getConnection("jdbc:sqlite:botData.db3")
         YCPluginMain.launch {
             val statement = historyConn.createStatement()
             val rSet = Sql.readSqlData(statement, "Id", "playerData")
@@ -191,9 +191,9 @@ object YCPluginMain : KotlinPlugin(
                     val user = sender.id
                     val statement0 = historyConn.createStatement()
                     val statement1 = historyConn.createStatement()
-                    val explore = Explore(statement1)
+                    val explore = ExploreUtils()
                     val CAN_SIGN = Sql.readSqlData(statement0, "count(*)", "signMap", "Id=${user}").getInt(1)
-                    if (user !in signList) {
+                    if (user !in signList && user in YCListData.playerCanLogon) {
                         signList.add(user)
 //======================================================================================================================
                         if (CAN_SIGN == 0) {
@@ -211,21 +211,21 @@ object YCPluginMain : KotlinPlugin(
                         val allNowDays = Sql.readSqlData(statement0, "AllSign", "signMap", "Id=${user}").getInt(1)
                         val monNowDays = Sql.readSqlData(statement0, "MonSign", "signMap", "Id=${user}").getInt(1)
                         //makeSpoils
-                        val spoils = explore.makeSpoils(statement1, sender.id)
-                        val money = spoils[0]
-                        val addExp = spoils[1]
+                        val (money, addExp) = explore.makeSpoils(statement1, sender.id)
                         reply(At(sender) + "\n签到成功！\n累计签到:${allNowDays}\n本月签到:${monNowDays}\n${botMoney}+${money}\n经验+${addExp}")
                         try {
                             val trueMoney =
                                 Sql.readSqlData(statement1, "Money", "playerData", "Id=${sender.id}").getInt(1) + money
                             Sql.updateDate(statement1, "playerData", "Money", "$trueMoney", "Id=${sender.id}")
-                            explore.levelUp(addExp, sender.id)
+                            explore.levelUp(statement1, addExp, sender.id)
                             statement0.close()
                             statement1.close()
                         } catch (e: Exception) {
                             reply("唔，你貌似还没有注册哦，今天的奖励${botname}没办法给你了哦")
                         }
 
+                    } else if (sender.id !in YCListData.playerCanLogon) {
+                        reply("你还没有注册哦!\n注册使用:${YCCommand.logon} <冒险者的名称>\n冒险者的名字不要超过20个字哟")
                     } else {
                         reply(At(sender) + "你今天已经签到过了！")
                     }
@@ -233,13 +233,20 @@ object YCPluginMain : KotlinPlugin(
             }
 //===================================================================================================================
 // 文游部分
+            startsWith(YCCommand.type, removePrefix = true) {
+                when (sender.id !in deadList) {
+                    true -> reply("[正常]")
+                    false -> reply("[死亡]")
+                    else -> reply("[ERROR]")
+                }
+            }
             startsWith(YCCommand.logon, removePrefix = true) {
                 val statement = historyConn.createStatement()
                 if (sender.id in YCListData.playerCanLogon) {
                     reply(" 你已经注册过了！")
                     statement.close()
                 } else if (it == "") {
-                    reply("你还没有输入冒险者的名字哦\n指令格式\n${YCCommand.info} <冒险者的名字>")
+                    reply("你还没有输入冒险者的名字哦\n指令格式\n${YCCommand.logon} <冒险者的名字>")
                 } else {
                     if (it.length > 20) {
                         reply("你的昵称太长啦")
@@ -273,7 +280,7 @@ object YCPluginMain : KotlinPlugin(
             startsWith(YCCommand.info, removePrefix = true) {
                 val statement0 = historyConn.createStatement()
                 val statement1 = historyConn.createStatement()
-                val explore = Explore(statement1)
+                val explore = ExploreUtils()
                 val rSet = Sql.readSqlData(statement0, "playerData", "Id = ${sender.id}", true)
                 if (sender.id !in YCListData.playerCanLogon) {
                     reply("你还没有注册哦!\n注册使用:${YCCommand.logon} <冒险者的名称>\n冒险者的名字不要超过20个字哟")
@@ -286,7 +293,7 @@ object YCPluginMain : KotlinPlugin(
                                 玩家信息:
                                 游戏昵称:${rSet.getString(2)}
                                 等级:Lv${rSet.getInt(8)}
-                                经验:${rSet.getInt(3)}/${explore.maxExp(sender.id)}
+                                经验:${rSet.getInt(3)}/${explore.maxExp(statement1, sender.id)}
                                 生命:${rSet.getInt(4)}/${rSet.getInt(5)}
                                 攻击力:${rSet.getInt(7)}
                                 护甲:${rSet.getInt(6)}
@@ -307,7 +314,7 @@ object YCPluginMain : KotlinPlugin(
                         reply("你还没有注册哦!\n注册使用:${YCCommand.logon} <冒险者的名称>\n冒险者的名字不要超过20个字哟")
                     } else {
                         val statement = historyConn.createStatement()
-                        val explore = Explore(statement)
+                        val explore = ExploreUtils()
                         val senderNick =
                             Sql.readSqlData(statement, "Nick", "playerData", "Id=${sender.id}").getString(1)
                         if (sender.id in deadList) {
@@ -330,9 +337,7 @@ object YCPluginMain : KotlinPlugin(
                                     while (true) {
                                         if (senderSet.getInt(4) <= 0) {
                                             explore.setDead(statement, sender.id)
-                                            val spoils = explore.makeSpoils(statement, target.id)
-                                            val money = spoils[1]
-                                            val addExp = spoils[2]
+                                            val (money, addExp) = explore.makeSpoils(statement, target.id)
                                             reply("${targetNick}获胜啦~\n${botname}奖励${money}${botMoney}~\n春点个数:${
                                                 targetSet.getInt(9)
                                             }(+${money})")
@@ -341,29 +346,27 @@ object YCPluginMain : KotlinPlugin(
                                                 "Money",
                                                 "${targetSet.getInt(9) + money}",
                                                 "Id=${target.id}")
-                                            val str = explore.levelUp(addExp, target.id)
+                                            val str = explore.levelUp(statement, addExp, target.id)
                                             reply(str)
                                             statement.close()
                                             break
                                         }
                                         if (targetSet.getInt(4) <= 0) {
                                             explore.setDead(statement, target.id)
-                                            val spoils = explore.makeSpoils(statement, sender.id)
-                                            val money = spoils[1]
-                                            val addExp = spoils[2]
+                                            val (money, addExp) = explore.makeSpoils(statement, sender.id)
                                             reply("${senderNick}获胜啦~\n${botname}奖励${money}春点~\n春点个数:${senderSet.getInt(9)}(+${money})")
                                             Sql.updateDate(statement,
                                                 "playerData",
                                                 "Money",
                                                 "${senderSet.getInt(9) + money}",
                                                 "Id=${sender.id}")
-                                            val str = explore.levelUp(addExp, sender.id)
+                                            val str = explore.levelUp(statement, addExp, sender.id)
                                             reply(str)
                                             statement.close()
                                             break
                                         }
-                                        val pvpAttack = explore.pvpAttack(senderSet, targetSet)
-                                        reply(pvpAttack)
+                                        //val pvpAttack = explore.pvpAttack(senderSet, targetSet)
+                                        //reply(pvpAttack)
                                         /*val type = (1..3).random()
                                         if (type == 1) {
                                             reply("${senderNick}对${targetNick}造成了0.5倍伤害\n${targetNick}的生命:${nowHP[target.id]}(-${attack[sender.id]!! * 0.5})")
@@ -433,6 +436,7 @@ object YCPluginMain : KotlinPlugin(
         val exploreOver by value(".整理探索结果")
         val logon by value(".开始冒险")
         val info by value(".info")
+        val type by value(".状态")
 
     }
 
