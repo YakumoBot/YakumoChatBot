@@ -17,7 +17,7 @@ apply(plugin = "com.github.johnrengelman.shadow")
 apply(plugin = "java")
 
 group = "ltd.zake"
-version = "1.0.1-20Dec25b"
+version = "1.0.1-20Dec31"
 
 
 repositories {
@@ -30,6 +30,7 @@ kotlin.sourceSets.all {
     languageSettings.useExperimentalAnnotation("kotlin.RequiresOptIn")
 }
 dependencies {
+    implementation("org.junit.jupiter:junit-jupiter:5.4.2")
     compileOnly(kotlin("stdlib-jdk8"))
 
     val core = "1.3.0"
@@ -39,6 +40,8 @@ dependencies {
     compileOnly("net.mamoe:mirai-console:$console")
     compileOnly("net.mamoe:mirai-core:$core")
     implementation("org.xerial", "sqlite-jdbc", jdbc_sqlite)
+    implementation("com.squareup.okhttp3", "okhttp", "3.1.0")
+    implementation("com.beust:klaxon:5.0.1")
     //implementation("org.ktorm", "ktorm-core", ktorm)
 
     val pool = "2.9.0"

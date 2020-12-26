@@ -13,6 +13,7 @@ import ltd.zake.yakumochatbot.YCPluginMain.YCSetting.name
 import ltd.zake.yakumochatbot.business.PvpAttack
 import ltd.zake.yakumochatbot.utils.ExploreUtils
 import ltd.zake.yakumochatbot.utils.SqlDao
+import ltd.zake.yakumochatbot.utils.WeatherAPI
 import net.mamoe.mirai.console.data.AutoSavePluginConfig
 import net.mamoe.mirai.console.data.AutoSavePluginData
 import net.mamoe.mirai.console.data.value
@@ -23,6 +24,7 @@ import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
 import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.any
+import net.mamoe.mirai.message.data.buildXmlMessage
 import net.mamoe.mirai.message.nextMessage
 import net.mamoe.mirai.utils.info
 import java.sql.Connection
@@ -58,7 +60,7 @@ val Sql = SqlDao()
 object YCPluginMain : KotlinPlugin(
     JvmPluginDescription(
         "ltd.zake.YakumoChatBot",
-        "1.0.1-20Dec25b"
+        "1.0.1-20Dec31"
     )
 ) {
     val PERMISSION_EXECUTE_1 by lazy {
@@ -191,6 +193,28 @@ object YCPluginMain : KotlinPlugin(
                     }
                 }
             }
+            startsWith(YCCommand.weather, removePrefix = true) {
+                YCPluginMain.launch {
+                    try {
+                        val weather = WeatherAPI()
+                        val weatherList = weather.getWeather(weather.getCityId(it))
+                        val reply = """
+                            ${weatherList.city}今日天气:
+                            天气${weatherList.weather}
+                            气温:${weatherList.temperature}
+                            ${weatherList.winddirection}风
+                            风力${weatherList.windpower}级
+                            空气湿度${weatherList.humidity}
+                            [更新时间 ${weatherList.reporttime}]
+                        """.trimIndent()
+                        reply(reply)
+                    } catch (e: Exception) {
+                        reply("[错误]${e}")
+                    }
+
+
+                }
+            }
             startsWith(YCCommand.sign, removePrefix = true) {
                 YCPluginMain.launch {
                     val user = sender.id
@@ -242,7 +266,6 @@ object YCPluginMain : KotlinPlugin(
                 when (sender.id !in deadList) {
                     true -> reply("[正常]")
                     false -> reply("[死亡]")
-                    else -> reply("[ERROR]")
                 }
             }
             startsWith(YCCommand.logon, removePrefix = true) {
@@ -374,9 +397,13 @@ object YCPluginMain : KotlinPlugin(
         val name by value("test")
         val botname by value("莉莉白")
         val coldDown: Int by value(10)
+        val weatherAppKey: String by value("")
     }
 
     object YCCommand : AutoSavePluginConfig("YCCommand") {
+        //日常功能:
+        val weather by value(".天气")
+
         val dice by value(".r")
         val sign by value(".签到")
         val help by value(".help")
