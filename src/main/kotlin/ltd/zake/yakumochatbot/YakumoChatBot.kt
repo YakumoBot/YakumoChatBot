@@ -373,8 +373,6 @@ object YCPluginMain : KotlinPlugin(
     object YCSetting : AutoSavePluginConfig("YCSetting") {
         val name by value("test")
         val botname by value("莉莉白")
-        val qqID: Long by value(2351468409L)
-        val password by value("pyw20040429")
         val coldDown: Int by value(10)
     }
 
